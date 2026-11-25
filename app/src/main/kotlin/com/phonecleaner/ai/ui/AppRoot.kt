@@ -3,6 +3,7 @@ package com.phonecleaner.ai.ui
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Scaffold
@@ -46,17 +47,17 @@ fun AppRoot(vm: MainViewModel = viewModel()) {
             )
         },
     ) { pad ->
-        Box(Modifier.fillMaxSize().padding(pad)) {
+        Box(Modifier.fillMaxSize().padding(pad).imePadding()) {
             PlanDialogs(vm)
             when (screen) {
                 Screen.HOME -> HomeScreen(vm)
                 Screen.SCAN -> ScanScreen(vm)
                 Screen.RESEARCH -> ResearchScreen(vm)
                 Screen.LIST -> ListScreen(vm)
+                Screen.OPTIMIZE -> OptimizeScreen(vm)
                 Screen.RESTORE -> RestoreScreen(vm)
                 Screen.LOG -> LogScreen(vm)
                 Screen.SETTINGS -> SettingsScreen(vm)
-                else -> HomeScreen(vm)
             }
         }
     }

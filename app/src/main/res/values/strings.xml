@@ -171,4 +171,20 @@
     <string name="change_setting">%1$s: %2$s → %3$s</string>
     <string name="change_appop">%1$s — %2$s: %3$s → %4$s</string>
     <string name="log_empty">Nothing has been run yet.</string>
+    <string name="optimize_subtitle">Animations, ad-blocking DNS, restrict flagged apps</string>
+    <string name="optimize_intro">Optional. Each change saves the original value first and can be undone.</string>
+    <string name="optimize_choose">Choose what to do</string>
+    <string name="opt_animations">Faster animations (0.5x)</string>
+    <string name="opt_animations_info">Now: window %1$s, transition %2$s, animator %3$s</string>
+    <string name="opt_dns">Private DNS: %1$s</string>
+    <string name="opt_dns_info">Blocks many ads and trackers in all apps. Now: mode %1$s, host %2$s. Change the host in Settings.</string>
+    <string name="opt_overlay">Stop flagged apps from drawing over other apps</string>
+    <string name="opt_overlay_info">%1$d flagged apps have this permission.</string>
+    <string name="opt_background">Stop flagged apps from running in the background</string>
+    <string name="opt_background_info">%1$d flagged apps. They still work when you open them.</string>
+    <string name="optimize_review">Review and apply…</string>
+    <string name="optimize_flagged">Flagged apps still installed (%1$d)</string>
+    <string name="optimize_flagged_none">None. Flagged means ads, tracking or suspected malware according to the scan or the AI research.</string>
+    <string name="optimize_active">Active optimisations (%1$d)</string>
+    <string name="optimize_undo_all">Undo all of these</string>
 </resources>

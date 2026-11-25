@@ -105,6 +105,9 @@ fun HomeStepsTail(vm: MainViewModel) {
 
 @Composable
 fun HomeStepsOptimize(vm: MainViewModel) {
+    StepButton(stringResource(R.string.step_optimize), stringResource(R.string.optimize_subtitle)) {
+        vm.go(com.phonecleaner.ai.Screen.OPTIMIZE)
+    }
 }
 
 @Composable

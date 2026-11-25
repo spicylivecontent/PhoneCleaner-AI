@@ -171,4 +171,20 @@
     <string name="change_setting">%1$s: %2$s → %3$s</string>
     <string name="change_appop">%1$s — %2$s: %3$s → %4$s</string>
     <string name="log_empty">Inget har körts än.</string>
+    <string name="optimize_subtitle">Animationer, reklamblockerande DNS, begränsa flaggade appar</string>
+    <string name="optimize_intro">Valfritt. Varje ändring sparar först originalvärdet och går att ångra.</string>
+    <string name="optimize_choose">Välj vad som ska göras</string>
+    <string name="opt_animations">Snabbare animationer (0,5x)</string>
+    <string name="opt_animations_info">Nu: fönster %1$s, övergång %2$s, animator %3$s</string>
+    <string name="opt_dns">Privat DNS: %1$s</string>
+    <string name="opt_dns_info">Blockerar mycket reklam och spårning i alla appar. Nu: läge %1$s, värd %2$s. Byt värd under Inställningar.</string>
+    <string name="opt_overlay">Hindra flaggade appar från att visas över andra appar</string>
+    <string name="opt_overlay_info">%1$d flaggade appar har den behörigheten.</string>
+    <string name="opt_background">Hindra flaggade appar från att köra i bakgrunden</string>
+    <string name="opt_background_info">%1$d flaggade appar. De fungerar fortfarande när du öppnar dem.</string>
+    <string name="optimize_review">Granska och kör…</string>
+    <string name="optimize_flagged">Flaggade appar som finns kvar (%1$d)</string>
+    <string name="optimize_flagged_none">Inga. Flaggad betyder reklam, spårning eller misstänkt skadlig kod enligt skanningen eller AI-researchen.</string>
+    <string name="optimize_active">Aktiva optimeringar (%1$d)</string>
+    <string name="optimize_undo_all">Ångra alla dessa</string>
 </resources>
