@@ -58,6 +58,27 @@ fun HomeSteps(vm: MainViewModel) {
         scan?.let { stringResource(R.string.scan_done_fmt, it.apps.size, formatTime(it.time)) }
             ?: stringResource(R.string.scan_none),
     ) { vm.go(com.phonecleaner.ai.Screen.SCAN) }
+    val analyses by vm.analyses.collectAsStateWithLifecycle()
+    val hasKey by vm.hasApiKey.collectAsStateWithLifecycle()
+    val candidates = scan?.let { vm.researchCandidates(it) }.orEmpty()
+    StepButton(
+        stringResource(R.string.step_research),
+        when {
+            scan == null -> stringResource(R.string.research_need_scan)
+            !hasKey -> stringResource(R.string.research_need_key)
+            else -> stringResource(R.string.research_status_fmt, candidates.count { it.pkg in analyses }, candidates.size)
+        },
+        enabled = scan != null,
+    ) { vm.go(com.phonecleaner.ai.Screen.RESEARCH) }
+    HomeStepsMore(vm)
+    StepButton(
+        stringResource(R.string.settings),
+        stringResource(if (hasKey) R.string.settings_key_saved else R.string.settings_key_missing),
+    ) { vm.go(com.phonecleaner.ai.Screen.SETTINGS) }
+}
+
+@Composable
+fun HomeStepsMore(vm: MainViewModel) {
 }
 
 @Composable

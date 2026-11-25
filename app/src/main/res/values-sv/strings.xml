@@ -60,4 +60,40 @@
         <item>Läser inställningar…</item>
         <item>Klart</item>
     </string-array>
+    <string name="save">Spara</string>
+    <string name="delete">Ta bort</string>
+    <string name="cancel">Avbryt</string>
+    <string name="research_need_scan">Kör skanningen först.</string>
+    <string name="research_need_key">Lägg in din Claude API-nyckel under Inställningar först.</string>
+    <string name="research_status_fmt">%1$d av %2$d paket analyserade</string>
+    <string name="settings_key_saved">API-nyckel sparad (krypterad på telefonen)</string>
+    <string name="settings_key_missing">Ingen API-nyckel sparad</string>
+    <string name="settings_api_key">Claude API-nyckel</string>
+    <string name="settings_api_key_info">Skapa en nyckel på console.anthropic.com. Den krypteras med Android Keystore och skickas bara till api.anthropic.com.</string>
+    <string name="settings_test_key">Testa</string>
+    <string name="settings_test_result">Test: %1$s</string>
+    <string name="settings_model">Modell</string>
+    <string name="settings_model_info">Opus är mest noggrann. Sonnet och Haiku är billigare. Webbsökning kostar dessutom 10 USD per 1 000 sökningar.</string>
+    <string name="settings_dns">Reklamblockerande DNS</string>
+    <string name="settings_dns_info">Värdnamn som används för Privat DNS i optimeringssteget.</string>
+    <string name="settings_cache">Analyscache</string>
+    <string name="settings_cache_info">Analyserade paket sparas så att de aldrig kostar pengar två gånger.</string>
+    <string name="settings_cache_clear">Töm cachen</string>
+    <string name="settings_language_info">Språket följer telefonen: svenska på en svensk telefon, annars engelska. På Android 13+ kan du också byta under appens systeminställningar → Språk.</string>
+    <string name="research_intro">Claude slår upp varje paket (med webbsökning) och bedömer om det är säkert att ta bort. Ingenting på telefonen ändras i det här steget.</string>
+    <string name="research_plan">Plan</string>
+    <string name="research_plan_fmt">%1$d låsta paket hoppas över\n%2$d redan analyserade (cachade, gratis)\n%3$d att analysera i %4$d anrop</string>
+    <string name="research_model_fmt">Modell: %1$s</string>
+    <string name="research_estimate_fmt">Beräknad kostnad: %1$s – %2$s (grov uppskattning; verklig kostnad visas under körningen)</string>
+    <string name="research_start">Starta research</string>
+    <string name="research_continue">Fortsätt research</string>
+    <string name="research_progress">Förlopp</string>
+    <string name="research_progress_fmt">Anrop %1$d av %2$d · %3$d paket analyserade</string>
+    <string name="research_cost_fmt">Kostnad hittills: %1$s (%2$d indatatoken, %3$d utdatatoken, %4$d sökningar)</string>
+    <string name="research_keep_open">Håll appen öppen. Varje anrop kan ta några minuter.</string>
+    <string name="research_done">Klart. Öppna ”Granska listan”.</string>
+    <string name="research_err_key">API-nyckeln godkändes inte: %1$s</string>
+    <string name="research_err_network">Nätverksproblem: %1$s</string>
+    <string name="research_resume_hint">Färdiga anrop är sparade. Tryck Fortsätt för att ta vid där det stannade.</string>
+    <string name="research_all_cached">Allt är analyserat. Öppna ”Granska listan” från startsidan.</string>
 </resources>

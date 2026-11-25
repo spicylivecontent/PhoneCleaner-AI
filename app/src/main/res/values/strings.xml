@@ -60,4 +60,40 @@
         <item>Reading settings…</item>
         <item>Done</item>
     </string-array>
+    <string name="save">Save</string>
+    <string name="delete">Delete</string>
+    <string name="cancel">Cancel</string>
+    <string name="research_need_scan">Run the scan first.</string>
+    <string name="research_need_key">Add your Claude API key in Settings first.</string>
+    <string name="research_status_fmt">%1$d of %2$d packages analysed</string>
+    <string name="settings_key_saved">API key saved (encrypted on this phone)</string>
+    <string name="settings_key_missing">No API key saved</string>
+    <string name="settings_api_key">Claude API key</string>
+    <string name="settings_api_key_info">Create a key at console.anthropic.com. It is encrypted with the Android Keystore and only ever sent to api.anthropic.com.</string>
+    <string name="settings_test_key">Test</string>
+    <string name="settings_test_result">Test: %1$s</string>
+    <string name="settings_model">Model</string>
+    <string name="settings_model_info">Opus is the most careful. Sonnet and Haiku are cheaper. Web search costs $10 per 1,000 searches on top.</string>
+    <string name="settings_dns">Ad-blocking DNS</string>
+    <string name="settings_dns_info">Host name used for Private DNS in the optimisation step.</string>
+    <string name="settings_cache">Analysis cache</string>
+    <string name="settings_cache_info">Analysed packages are saved so they are never paid for twice.</string>
+    <string name="settings_cache_clear">Clear cache</string>
+    <string name="settings_language_info">Language follows the phone: Swedish on a Swedish phone, otherwise English. On Android 13+ you can also change it under the app’s system settings → Language.</string>
+    <string name="research_intro">Claude looks up each package (with web search) and says whether it is safe to remove. Nothing on the phone is changed in this step.</string>
+    <string name="research_plan">Plan</string>
+    <string name="research_plan_fmt">%1$d locked packages are skipped\n%2$d already analysed (cached, free)\n%3$d to analyse in %4$d requests</string>
+    <string name="research_model_fmt">Model: %1$s</string>
+    <string name="research_estimate_fmt">Estimated cost: %1$s – %2$s (rough; the real cost is shown while it runs)</string>
+    <string name="research_start">Start research</string>
+    <string name="research_continue">Continue research</string>
+    <string name="research_progress">Progress</string>
+    <string name="research_progress_fmt">Request %1$d of %2$d · %3$d packages analysed</string>
+    <string name="research_cost_fmt">Cost so far: %1$s (%2$d input tokens, %3$d output tokens, %4$d searches)</string>
+    <string name="research_keep_open">Keep the app open. Each request can take a few minutes.</string>
+    <string name="research_done">Done. Open “Review list”.</string>
+    <string name="research_err_key">The API key was rejected: %1$s</string>
+    <string name="research_err_network">Network problem: %1$s</string>
+    <string name="research_resume_hint">Finished requests are saved. Press Continue to carry on where it stopped.</string>
+    <string name="research_all_cached">Everything is analysed. Open “Review list” from the start page.</string>
 </resources>

@@ -50,6 +50,8 @@ fun AppRoot(vm: MainViewModel = viewModel()) {
             when (screen) {
                 Screen.HOME -> HomeScreen(vm)
                 Screen.SCAN -> ScanScreen(vm)
+                Screen.RESEARCH -> ResearchScreen(vm)
+                Screen.SETTINGS -> SettingsScreen(vm)
                 else -> HomeScreen(vm)
             }
         }
