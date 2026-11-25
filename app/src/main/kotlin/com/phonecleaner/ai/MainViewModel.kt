@@ -18,6 +18,7 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.combine
 import com.phonecleaner.ai.scan.Scanner
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -189,6 +190,52 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
 
     fun cancelResearch() {
         researchJob?.cancel()
+    }
+
+    // ---- Step 3: review list ----
+    enum class Group { MALWARE, ADS, SAFE, UNSURE, LOCKED }
+
+    data class Row(val app: AppInfo, val analysis: AnalysisEntity?) {
+        val group: Group = when {
+            app.locked || analysis?.verdict == "keep" -> Group.LOCKED
+            analysis?.suspectedMalware == true || app.suspicious -> Group.MALWARE
+            analysis?.isAdOrTracker == true -> Group.ADS
+            analysis?.verdict == "safe" -> Group.SAFE
+            else -> Group.UNSURE
+        }
+        val selectable get() = group != Group.LOCKED
+
+        /**
+         * Pre-ticked only when Claude says "safe" and it is not simply an app
+         * the user installed on purpose.
+         */
+        val defaultChecked get() = selectable && analysis?.verdict == "safe" &&
+            (app.isSystem || analysis.isAdOrTracker || analysis.suspectedMalware)
+    }
+
+    /** The user's own ticks; packages not in the map use the default. */
+    private val overrides = MutableStateFlow<Map<String, Boolean>>(emptyMap())
+
+    val rows = combine(scan, analyses) { s, a ->
+        s?.apps.orEmpty().filter { it.installed }.map { Row(it, a[it.pkg]) }
+    }.stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())
+
+    val selected = combine(rows, overrides) { r, o ->
+        r.filter { it.selectable && (o[it.app.pkg] ?: it.defaultChecked) }.map { it.app.pkg }.toSet()
+    }.stateIn(viewModelScope, SharingStarted.Eagerly, emptySet())
+
+    fun toggle(pkg: String, checked: Boolean) {
+        val row = rows.value.firstOrNull { it.app.pkg == pkg } ?: return
+        if (!row.selectable) return
+        overrides.value = overrides.value + (pkg to checked)
+    }
+
+    fun uncheckAll() {
+        overrides.value = rows.value.filter { it.selectable }.associate { it.app.pkg to false }
+    }
+
+    fun resetSelection() {
+        overrides.value = emptyMap()
     }
 
     companion object {

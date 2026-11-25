@@ -79,6 +79,19 @@ fun HomeSteps(vm: MainViewModel) {
 
 @Composable
 fun HomeStepsMore(vm: MainViewModel) {
+    val scan by vm.scan.collectAsStateWithLifecycle()
+    val selected by vm.selected.collectAsStateWithLifecycle()
+    StepButton(
+        stringResource(R.string.step_list),
+        if (scan == null) stringResource(R.string.research_need_scan)
+        else stringResource(R.string.list_status_fmt, selected.size),
+        enabled = scan != null,
+    ) { vm.go(com.phonecleaner.ai.Screen.LIST) }
+    HomeStepsTail(vm)
+}
+
+@Composable
+fun HomeStepsTail(vm: MainViewModel) {
 }
 
 @Composable

@@ -51,6 +51,7 @@ fun AppRoot(vm: MainViewModel = viewModel()) {
                 Screen.HOME -> HomeScreen(vm)
                 Screen.SCAN -> ScanScreen(vm)
                 Screen.RESEARCH -> ResearchScreen(vm)
+                Screen.LIST -> ListScreen(vm)
                 Screen.SETTINGS -> SettingsScreen(vm)
                 else -> HomeScreen(vm)
             }
