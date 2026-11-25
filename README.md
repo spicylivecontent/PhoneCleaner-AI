@@ -43,3 +43,11 @@ export KEYSTORE_FILE=/sökväg/release.p12 KEYSTORE_PASSWORD=... KEY_ALIAS=phone
 ```
 
 Utan dessa variabler byggs en osignerad release-APK.
+
+## Tester
+
+```
+./gradlew testDebugUnitTest
+```
+
+Testerna kör appens riktiga logik mot en simulerad telefon (skalkommandon), en låtsasserver för Claude API och ritar upp alla skärmar på svenska och engelska. De kontrollerar bland annat att skanningen aldrig ändrar något, att låsta paket aldrig kan tas bort, att inget körs före bekräftelse och att allt går att återställa.

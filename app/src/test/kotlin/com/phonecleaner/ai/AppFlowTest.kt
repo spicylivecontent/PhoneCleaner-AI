@@ -114,6 +114,8 @@ class AppFlowTest {
     @After fun tearDown() {
         ShizukuManager.setTestShell(null)
         AppDb.closeForTest()
+        app.deleteDatabase("phonecleaner.db")
+        java.io.File(app.filesDir, "scan.json").delete()
     }
 
     private fun scan() {

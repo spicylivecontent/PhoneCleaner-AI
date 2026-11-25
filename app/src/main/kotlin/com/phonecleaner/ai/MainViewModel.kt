@@ -66,15 +66,6 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
     val scanError = MutableStateFlow<String?>(null)
     private val scanFile get() = File(getApplication<Application>().filesDir, "scan.json")
 
-    init {
-        viewModelScope.launch {
-            scan.value = withContext(Dispatchers.IO) {
-                runCatching { ScanResult.fromJson(JSONObject(scanFile.readText())) }.getOrNull()
-            }
-            onScanLoaded()
-        }
-    }
-
     fun startScan() {
         if (scanning.value) return
         scanning.value = true
@@ -462,6 +453,16 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
             } finally {
                 work.value = work.value.copy(running = false)
             }
+        }
+    }
+
+    // Kept last on purpose: it touches state declared above, which must exist first.
+    init {
+        viewModelScope.launch {
+            scan.value = withContext(Dispatchers.IO) {
+                runCatching { ScanResult.fromJson(JSONObject(scanFile.readText())) }.getOrNull()
+            }
+            onScanLoaded()
         }
     }
 
