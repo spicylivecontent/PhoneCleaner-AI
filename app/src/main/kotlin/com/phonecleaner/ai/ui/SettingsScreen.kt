@@ -63,7 +63,12 @@ fun SettingsScreen(vm: MainViewModel) {
                     OutlinedButton(onClick = { vm.saveApiKey("") }) { Text(stringResource(R.string.delete)) }
                 }
             }
-            keyTest?.let { BodyText(stringResource(R.string.settings_test_result, it)) }
+            keyTest?.let {
+                BodyText(
+                    if (it == MainViewModel.KEY_UNREADABLE) stringResource(R.string.key_unreadable)
+                    else stringResource(R.string.settings_test_result, it)
+                )
+            }
         }
         SectionCard(stringResource(R.string.settings_model)) {
             BodyText(stringResource(R.string.settings_model_info))

@@ -83,7 +83,7 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
             try {
                 val result = Scanner(getApplication()).scan { scanStep.value = it }
                 scan.value = result
-                withContext(Dispatchers.IO) { scanFile.writeText(result.toJson().toString()) }
+                saveScan(result)
                 onScanLoaded()
             } catch (t: Throwable) {
                 scanError.value = t.message ?: t.javaClass.simpleName
@@ -94,6 +94,28 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     private fun onScanLoaded() {
+        // Ticks made against an older scan must not carry over to a new one.
+        overrides.value = emptyMap()
+    }
+
+    private val scanWriteLock = kotlinx.coroutines.sync.Mutex()
+
+    /** Single writer, written to a temp file and renamed, so the file is never half-written or out of order. */
+    private suspend fun saveScan(result: ScanResult) = withContext(Dispatchers.IO) {
+        scanWriteLock.lock()
+        try {
+            val latest = scan.value ?: result
+            val tmp = File(scanFile.parentFile, "scan.json.tmp")
+            tmp.writeText(latest.toJson().toString())
+            if (!tmp.renameTo(scanFile)) {
+                scanFile.writeText(latest.toJson().toString())
+                tmp.delete()
+            }
+        } catch (t: Throwable) {
+            // Losing the cached scan only means scanning again.
+        } finally {
+            scanWriteLock.unlock()
+        }
     }
 
     // ---- Settings ----
@@ -105,9 +127,14 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
     val keyTest = MutableStateFlow<String?>(null)
 
     fun saveApiKey(key: String) {
-        prefs.setApiKey(key)
-        hasApiKey.value = prefs.hasApiKey()
-        keyTest.value = null
+        viewModelScope.launch {
+            // Keystore work can be slow or fail on some phones: never on the main thread, never a crash.
+            val error = withContext(Dispatchers.IO) {
+                runCatching { prefs.setApiKey(key) }.exceptionOrNull()
+            }
+            hasApiKey.value = prefs.hasApiKey()
+            keyTest.value = error?.let { "Keystore: ${it.message ?: it.javaClass.simpleName}" }
+        }
     }
 
     fun setModel(m: ClaudeModel) {
@@ -125,10 +152,10 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
 
     /** Checks the key against the Models endpoint, which costs nothing. */
     fun testApiKey() {
-        val key = prefs.apiKey() ?: return
         keyTest.value = "…"
         viewModelScope.launch {
-            keyTest.value = ClaudeClient(key, model.value).testKey() ?: "OK"
+            val key = withContext(Dispatchers.IO) { prefs.apiKey() }
+            keyTest.value = if (key == null) KEY_UNREADABLE else ClaudeClient(key, model.value).testKey() ?: "OK"
         }
     }
 
@@ -146,6 +173,7 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
         val batchesDone: Int = 0,
         val packagesDone: Int = 0,
         val usage: Usage = Usage(),
+        val batchesFailed: Int = 0,
         val error: String? = null,
         val errorKind: ClaudeException.Kind? = null,
         val finished: Boolean = false,
@@ -159,25 +187,42 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
 
     fun startResearch() {
         val s = scan.value ?: return
-        val key = prefs.apiKey() ?: return
         if (research.value.running) return
+        // Set before anything suspends, so a double tap cannot start (and bill) two runs.
+        research.value = ResearchState(running = true)
         val m = model.value
         val swedish = java.util.Locale.getDefault().language == "sv"
         researchJob = viewModelScope.launch {
-            val cached = dao.analysesNow().map { it.pkg }.toSet()
-            val batches = researchCandidates(s).filter { it.pkg !in cached }.chunked(BATCH_SIZE)
-            research.value = ResearchState(running = true, batchesTotal = batches.size)
-            val client = ClaudeClient(key, m)
             try {
+                val key = withContext(Dispatchers.IO) { prefs.apiKey() }
+                if (key == null) {
+                    research.value = ResearchState(error = KEY_UNREADABLE, errorKind = ClaudeException.Kind.BAD_KEY)
+                    return@launch
+                }
+                val cached = dao.analysesNow().map { it.pkg }.toSet()
+                val batches = researchCandidates(s).filter { it.pkg !in cached }.chunked(BATCH_SIZE)
+                research.value = ResearchState(running = true, batchesTotal = batches.size)
+                val client = ClaudeClient(key, m, apiBaseUrl)
                 for (batch in batches) {
-                    val result = client.analyze(batch, s, swedish)
-                    dao.upsertAnalyses(result.items)
-                    research.value = research.value.let {
-                        it.copy(
-                            batchesDone = it.batchesDone + 1,
-                            packagesDone = it.packagesDone + result.items.size,
-                            usage = it.usage + result.usage,
-                        )
+                    try {
+                        val result = client.analyze(batch, s, swedish)
+                        dao.upsertAnalyses(result.items)
+                        research.value = research.value.let {
+                            it.copy(
+                                batchesDone = it.batchesDone + 1,
+                                packagesDone = it.packagesDone + result.items.size,
+                                usage = it.usage + result.usage,
+                            )
+                        }
+                    } catch (e: ClaudeException) {
+                        // What the failed request cost still counts.
+                        research.value = research.value.let { it.copy(usage = it.usage + e.usage) }
+                        val skippable = e.kind == ClaudeException.Kind.REFUSED || e.kind == ClaudeException.Kind.BAD_RESPONSE
+                        if (!skippable) throw e
+                        // One bad answer should not stop the rest; the batch stays un-analysed and can be retried.
+                        research.value = research.value.let {
+                            it.copy(batchesDone = it.batchesDone + 1, batchesFailed = it.batchesFailed + 1)
+                        }
                     }
                 }
                 research.value = research.value.copy(running = false, finished = true)
@@ -243,7 +288,7 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     // ---- Step 4: cleaning, optimisation and undo ----
-    private val ops = Ops(app, dao)
+    private val ops = Ops(File(app.filesDir, "backups"), dao)
     val changes = dao.changes().stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())
     val logs = dao.logs().stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())
 
@@ -301,11 +346,21 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
         val s = scan.value ?: return
         val next = transform(s)
         scan.value = next
-        viewModelScope.launch(Dispatchers.IO) { runCatching { scanFile.writeText(next.toJson().toString()) } }
+        viewModelScope.launch { saveScan(next) }
     }
 
     private fun setInstalled(pkg: String, installed: Boolean) = updateScan { s ->
         s.copy(apps = s.apps.map { if (it.pkg == pkg) it.copy(installed = installed) else it })
+    }
+
+    /**
+     * Changes are only made through a connected Shizuku running as the shell
+     * user (uid 2000). If Shizuku was started with root, the app refuses.
+     */
+    private fun shellProblem(): String? = when {
+        shizukuState.value != ShizukuState.READY -> ERR_SHIZUKU
+        shizukuUid.value != 2000 -> ERR_ROOT
+        else -> null
     }
 
     /** Runs the confirmed plan: backup file first, then each change, all logged. */
@@ -313,8 +368,8 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
         val plan = pendingPlan.value ?: return
         pendingPlan.value = null
         if (work.value.running) return
-        if (shizukuState.value != ShizukuState.READY) {
-            work.value = WorkState(visible = true, error = "Shizuku")
+        shellProblem()?.let {
+            work.value = WorkState(visible = true, error = it)
             return
         }
         work.value = WorkState(visible = true, running = true, total = plan.size)
@@ -323,11 +378,18 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
                 val backup = ops.writeBackup(plan)
                 work.value = work.value.copy(backupPath = backup.absolutePath)
                 val apps = scan.value?.apps.orEmpty().associateBy { it.pkg }
+                // The scan may be days old: re-check what is a launcher, keyboard or default app right now.
+                val protectedNow = if (plan.any { it.kind == Ops.UNINSTALL }) Scanner(getApplication()).protectedNow().keys else emptySet()
                 for (p in plan) {
                     var disabled = false
                     val ok = if (p.kind == Ops.UNINSTALL) {
                         val app = apps[p.target]
-                        val kind = if (app == null) null else ops.removePackage(app)
+                        // Also honour a "keep" verdict that arrived after the list was confirmed.
+                        val stillAllowed = rows.value.firstOrNull { it.app.pkg == p.target }?.selectable == true
+                        val kind = if (app == null || !stillAllowed || p.target in protectedNow) {
+                            ops.refuse(p.target)
+                            null
+                        } else ops.removePackage(app)
                         if (kind != null) setInstalled(p.target, false)
                         disabled = kind == Ops.DISABLE
                         kind != null
@@ -358,11 +420,24 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
         if (!work.value.running) work.value = WorkState()
     }
 
-    /** Undoes the given recorded changes (newest first). */
-    fun revert(list: List<ChangeEntity>) {
+    /** Changes waiting to be undone, shown for confirmation first. */
+    val pendingRevert = MutableStateFlow<List<ChangeEntity>?>(null)
+
+    fun planRevert(list: List<ChangeEntity>) {
+        if (list.isNotEmpty()) pendingRevert.value = list.sortedByDescending { it.id }
+    }
+
+    fun cancelRevert() {
+        pendingRevert.value = null
+    }
+
+    /** Undoes the confirmed changes, newest first. */
+    fun confirmRevert() {
+        val list = pendingRevert.value ?: return
+        pendingRevert.value = null
         if (work.value.running || list.isEmpty()) return
-        if (shizukuState.value != ShizukuState.READY) {
-            work.value = WorkState(visible = true, restoring = true, error = "Shizuku")
+        shellProblem()?.let {
+            work.value = WorkState(visible = true, restoring = true, error = it)
             return
         }
         work.value = WorkState(visible = true, running = true, restoring = true, total = list.size)
@@ -390,7 +465,14 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
         }
     }
 
+    /** Overridden in tests to point at a local server. */
+    @androidx.annotation.VisibleForTesting
+    var apiBaseUrl: String = "https://api.anthropic.com"
+
     companion object {
         const val BATCH_SIZE = 15
+        const val ERR_SHIZUKU = "Shizuku"
+        const val ERR_ROOT = "Root"
+        const val KEY_UNREADABLE = "KEY_UNREADABLE"
     }
 }

@@ -187,4 +187,8 @@
     <string name="optimize_flagged_none">Inga. Flaggad betyder reklam, spårning eller misstänkt skadlig kod enligt skanningen eller AI-researchen.</string>
     <string name="optimize_active">Aktiva optimeringar (%1$d)</string>
     <string name="optimize_undo_all">Ångra alla dessa</string>
+    <string name="err_root">Shizuku körs som root. Appen gör bara ändringar som shell-användare (ingen root). Starta om Shizuku med trådlös felsökning i stället.</string>
+    <string name="key_unreadable">Den sparade API-nyckeln kunde inte läsas. Skriv in den igen.</string>
+    <string name="research_failed_fmt">%1$d anrop gav inget användbart svar. Deras paket förblir oanalyserade; tryck Fortsätt för att försöka igen.</string>
+    <string name="lock_unknown">Kunde inte identifieras. Tas aldrig bort.</string>
 </resources>

@@ -156,6 +156,7 @@ private fun lockText(r: LockReason?) = when (r) {
     LockReason.PERSISTENT -> R.string.lock_persistent
     LockReason.RESOURCE_OVERLAY -> R.string.lock_overlay
     LockReason.SELF -> R.string.lock_self
+    LockReason.UNKNOWN -> R.string.lock_unknown
     else -> R.string.lock_core
 }
 

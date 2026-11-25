@@ -20,10 +20,15 @@ data class ShellResult(val exitCode: Int, val output: String) {
     val ok get() = exitCode == 0
 }
 
+/** Something that can run a shell command on the phone. */
+interface Shell {
+    suspend fun exec(command: String): ShellResult
+}
+
 class ShellUnavailableException : Exception("Shizuku shell is not connected")
 
 /** Owns the Shizuku connection and is the only place that runs shell commands. */
-object ShizukuManager {
+object ShizukuManager : Shell {
     const val SHIZUKU_PACKAGE = "moe.shizuku.privileged.api"
     private const val REQUEST_CODE = 4711
 
@@ -53,6 +58,11 @@ object ShizukuManager {
                 service = s
                 _uid.value = runCatching { s.uid() }.getOrDefault(-1)
                 _state.value = ShizukuState.READY
+            } else {
+                // Dead or missing binder: allow a new bind attempt instead of hanging on "connecting".
+                service = null
+                bound = false
+                _state.value = ShizukuState.NOT_RUNNING
             }
         }
 
@@ -84,6 +94,7 @@ object ShizukuManager {
 
     /** Re-evaluates the state and binds the shell service when possible. */
     fun refresh() {
+        if (testShell != null) return
         val alive = runCatching { Shizuku.pingBinder() }.getOrDefault(false)
         if (!alive) {
             service = null
@@ -117,8 +128,23 @@ object ShizukuManager {
         runCatching { Shizuku.requestPermission(REQUEST_CODE) }
     }
 
+    /** Replaces the real shell in tests. Never used in the app itself. */
+    @Volatile private var testShell: Shell? = null
+
+    @androidx.annotation.VisibleForTesting
+    fun setTestShell(shell: Shell?, uid: Int = 2000) {
+        testShell = shell
+        if (shell != null) {
+            _uid.value = uid
+            _state.value = ShizukuState.READY
+        } else {
+            _state.value = ShizukuState.NOT_RUNNING
+        }
+    }
+
     /** Runs a shell command through the Shizuku user service. */
-    suspend fun exec(command: String): ShellResult = withContext(Dispatchers.IO) {
+    override suspend fun exec(command: String): ShellResult = withContext(Dispatchers.IO) {
+        testShell?.let { return@withContext it.exec(command) }
         val s = service ?: throw ShellUnavailableException()
         val pfd = try {
             s.run(command)

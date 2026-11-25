@@ -38,7 +38,7 @@ object Critical {
         // Xiaomi / HyperOS core
         "com.miui.securitycenter", "com.miui.home", "com.miui.core", "com.miui.system", "com.miui.rom",
         "com.miui.securitycore", "com.miui.securityadd", "com.miui.powerkeeper", "com.miui.guardprovider",
-        "com.miui.packageinstaller", "com.miui.aod", "com.miui.notification", "com.miui.daemon",
+        "com.miui.packageinstaller", "com.miui.global.packageinstaller", "com.miui.aod", "com.miui.notification", "com.miui.daemon",
         "com.miui.face", "com.miui.miwallpaper", "com.miui.systemui.carriers.overlay",
         "com.miui.settings.rro.device.config.overlay", "com.miui.securityinputmethod",
         "com.miui.misound", "com.miui.audiomonitor", "com.miui.cit", "com.miui.cloudbackup",

@@ -187,4 +187,8 @@
     <string name="optimize_flagged_none">None. Flagged means ads, tracking or suspected malware according to the scan or the AI research.</string>
     <string name="optimize_active">Active optimisations (%1$d)</string>
     <string name="optimize_undo_all">Undo all of these</string>
+    <string name="err_root">Shizuku is running as root. This app only makes changes as the shell user (no root). Restart Shizuku with wireless debugging instead.</string>
+    <string name="key_unreadable">The saved API key could not be read. Enter it again.</string>
+    <string name="research_failed_fmt">%1$d requests gave no usable answer. Their packages stay un-analysed; press Continue to try them again.</string>
+    <string name="lock_unknown">Could not be identified. Never removed.</string>
 </resources>

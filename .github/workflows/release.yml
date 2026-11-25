@@ -39,7 +39,7 @@ jobs:
           cache-disabled: true
 
       - name: Install Android platform
-        run: yes | "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" "platforms;android-37.2" > /dev/null || true
+        run: yes | "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" "platforms;android-37.2" > /dev/null || echo "::warning::Could not preinstall the platform; Gradle will try to download it."
 
       - name: Decode keystore
         env:
@@ -62,8 +62,9 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          TAG="v${{ github.run_number }}"
+          TAG="v${{ github.run_number }}.${{ github.run_attempt }}"
           gh release create "$TAG" PhoneCleanerAI.apk \
+            --target "${{ github.sha }}" \
             --title "PhoneCleaner AI build ${{ github.run_number }}" \
             --notes "Commit ${{ github.sha }}. Download PhoneCleanerAI.apk below and open it on the phone." \
             --latest

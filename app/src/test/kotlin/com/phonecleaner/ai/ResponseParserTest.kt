@@ -20,4 +20,13 @@ class ResponseParserTest {
         assertEquals("keep", items[1].verdict)
         assertTrue(ResponseParser.parse("no json here", "m").isEmpty())
     }
+
+    @Test fun toleratesTrailingBracketsAndTruncation() {
+        val obj = { p: String -> """{"package":"$p","appName":"a ] } [","whatItDoes":"x \" y","verdict":"safe","risk":"","isAdOrTracker":false,"suspectedMalware":false,"sources":["https://e.com/[1]"]}""" }
+        val trailing = "[${obj("com.a.b")}, ${obj("com.c.d")}]\nSources: [1] [2]"
+        assertEquals(listOf("com.a.b", "com.c.d"), ResponseParser.parse(trailing, "m").map { it.pkg })
+        val cut = "[${obj("com.a.b")}, ${obj("com.c.d")}, {\"package\":\"com.e.f\",\"appNa"
+        assertEquals(listOf("com.a.b", "com.c.d"), ResponseParser.parse(cut, "m").map { it.pkg })
+        assertEquals("a ] } [", ResponseParser.parse(trailing, "m")[0].appName)
+    }
 }

@@ -45,7 +45,8 @@ data class Usage(val inputTokens: Long = 0, val outputTokens: Long = 0, val sear
     }
 }
 
-class ClaudeException(val kind: Kind, message: String) : Exception(message) {
+/** [usage] is what the failed request still cost, so the displayed total stays honest. */
+class ClaudeException(val kind: Kind, message: String, val usage: Usage = Usage()) : Exception(message) {
     enum class Kind { BAD_KEY, REFUSED, BAD_RESPONSE, HTTP, NETWORK }
 }
 
@@ -55,7 +56,11 @@ data class BatchResult(val items: List<AnalysisEntity>, val usage: Usage)
  * Minimal Messages API client (raw HTTPS). Uses the server-side web search
  * tool so Claude can look up unfamiliar packages before giving a verdict.
  */
-class ClaudeClient(private val apiKey: String, private val model: ClaudeModel) {
+class ClaudeClient(
+    private val apiKey: String,
+    private val model: ClaudeModel,
+    private val baseUrl: String = "https://api.anthropic.com",
+) {
 
     private val http = OkHttpClient.Builder()
         .connectTimeout(30, TimeUnit.SECONDS)
@@ -84,7 +89,7 @@ class ClaudeClient(private val apiKey: String, private val model: ClaudeModel) {
 
     /** Free check that the key and model work. Returns null when fine, else an error text. */
     suspend fun testKey(): String? = try {
-        http.newCall(request("$BASE/v1/models/${model.id}").get().build()).await().use { r ->
+        http.newCall(request("$baseUrl/v1/models/${model.id}").get().build()).await().use { r ->
             if (r.isSuccessful) null else "${r.code}: ${errorMessage(r.body.string())}"
         }
     } catch (e: IOException) {
@@ -98,7 +103,7 @@ class ClaudeClient(private val apiKey: String, private val model: ClaudeModel) {
         var attempt = 0
         while (true) {
             attempt++
-            val builder = request("$BASE/v1/messages")
+            val builder = request("$baseUrl/v1/messages")
                 .post(body.toString().toRequestBody("application/json".toMediaType()))
             if (model.fallbacks) builder.header("anthropic-beta", FALLBACK_BETA)
             val (code, text, retryAfter) = try {
@@ -106,7 +111,10 @@ class ClaudeClient(private val apiKey: String, private val model: ClaudeModel) {
                     Triple(r.code, r.body.string(), r.header("retry-after")?.toLongOrNull())
                 }
             } catch (e: IOException) {
-                if (attempt >= 3) throw ClaudeException(ClaudeException.Kind.NETWORK, e.message ?: "network error")
+                // Only retry when the request cannot have reached the API. A dropped
+                // connection after that may already have been billed, so it is not repeated.
+                val notSent = e is java.net.ConnectException || e is java.net.UnknownHostException
+                if (!notSent || attempt >= 3) throw ClaudeException(ClaudeException.Kind.NETWORK, e.message ?: e.javaClass.simpleName)
                 delay(3000L * attempt)
                 continue
             }
@@ -134,18 +142,21 @@ class ClaudeClient(private val apiKey: String, private val model: ClaudeModel) {
         )
         var usage = Usage()
         var directSearch = false
+        var newestTool = true
         var resp: JSONObject
         var rounds = 0
         while (true) {
-            val tool = JSONObject()
-                .put("type", "web_search_20260318")
-                .put("name", "web_search")
-                .put("max_uses", 10)
-                .put("response_inclusion", "excluded")
+            val tool = JSONObject().put("name", "web_search").put("max_uses", 10)
+            if (newestTool) {
+                // Newest version: search results the model already filtered are left out of the response.
+                tool.put("type", "web_search_20260318").put("response_inclusion", "excluded")
+            } else {
+                tool.put("type", "web_search_20260209")
+            }
             if (directSearch) tool.put("allowed_callers", JSONArray().put("direct"))
             val body = JSONObject()
                 .put("model", model.id)
-                .put("max_tokens", 16000)
+                .put("max_tokens", MAX_TOKENS)
                 .put("system", Prompts.system(swedish))
                 .put("output_config", JSONObject().put("effort", "medium"))
                 .put("tools", JSONArray().put(tool))
@@ -156,17 +167,26 @@ class ClaudeClient(private val apiKey: String, private val model: ClaudeModel) {
             resp = try {
                 post(body)
             } catch (e: ClaudeException) {
-                // Models without programmatic tool calling must call web search directly.
-                if (e.kind == ClaudeException.Kind.HTTP && !directSearch && e.message.orEmpty().contains("allowed_callers")) {
-                    directSearch = true
-                    continue
+                val msg = e.message.orEmpty()
+                if (e.kind == ClaudeException.Kind.HTTP && msg.startsWith("400")) {
+                    // Models without programmatic tool calling must call web search directly.
+                    if (!directSearch && msg.contains("allowed_callers")) {
+                        directSearch = true
+                        continue
+                    }
+                    // A model or account that does not accept the newest tool version yet.
+                    if (newestTool && rounds == 0 && (msg.contains("web_search_20260318") || msg.contains("response_inclusion"))) {
+                        newestTool = false
+                        continue
+                    }
                 }
-                throw e
+                throw ClaudeException(e.kind, msg, usage)
             }
             usage += usageOf(resp)
             val stop = resp.optString("stop_reason")
-            if (stop == "refusal") throw ClaudeException(ClaudeException.Kind.REFUSED, "the model declined this batch")
-            if (stop == "pause_turn" && ++rounds < 6) {
+            if (stop == "refusal") throw ClaudeException(ClaudeException.Kind.REFUSED, "the model declined this batch", usage)
+            if (stop == "pause_turn") {
+                if (++rounds >= MAX_ROUNDS) throw ClaudeException(ClaudeException.Kind.BAD_RESPONSE, "the search did not finish", usage)
                 // Long search turn: send the paused assistant message back unchanged to continue.
                 messages.put(JSONObject().put("role", "assistant").put("content", resp.getJSONArray("content")))
                 continue
@@ -177,29 +197,30 @@ class ClaudeClient(private val apiKey: String, private val model: ClaudeModel) {
         val content = resp.optJSONArray("content") ?: JSONArray()
         val text = StringBuilder()
         for (i in 0 until content.length()) {
-            val block = content.getJSONObject(i)
+            val block = content.optJSONObject(i) ?: continue
             if (block.optString("type") == "text") text.append(block.optString("text"))
         }
         val wanted = batch.associateBy { it.pkg }
         val items = ResponseParser.parse(text.toString(), model.id).filter { it.pkg in wanted }
-        if (items.isEmpty()) throw ClaudeException(ClaudeException.Kind.BAD_RESPONSE, "no usable JSON in the answer")
+        if (items.isEmpty()) {
+            val why = if (resp.optString("stop_reason") == "max_tokens") "the answer was cut off" else "no usable JSON in the answer"
+            throw ClaudeException(ClaudeException.Kind.BAD_RESPONSE, why, usage)
+        }
         return BatchResult(items, usage)
     }
 
     companion object {
-        private const val BASE = "https://api.anthropic.com"
         private const val API_VERSION = "2026-10-21"
         private const val FALLBACK_BETA = "server-side-fallback-2026-07-01"
+        private const val MAX_TOKENS = 16000
+        private const val MAX_ROUNDS = 6
     }
 }
 
 object ResponseParser {
     /** Extracts the JSON array of verdicts from the model's final text. */
     fun parse(text: String, model: String, now: Long = System.currentTimeMillis()): List<AnalysisEntity> {
-        val start = Regex("\\[\\s*\\{").find(text)?.range?.first ?: return emptyList()
-        val end = text.lastIndexOf(']')
-        if (end <= start) return emptyList()
-        val arr = runCatching { JSONArray(text.substring(start, end + 1)) }.getOrNull() ?: return emptyList()
+        val arr = extractArray(text) ?: return emptyList()
         val out = ArrayList<AnalysisEntity>()
         for (i in 0 until arr.length()) {
             val o = arr.optJSONObject(i) ?: continue
@@ -224,6 +245,42 @@ object ResponseParser {
         }
         return out
     }
+}
+
+/**
+ * Finds the first JSON array of objects in [text] by matching brackets (ignoring
+ * those inside strings), so text or brackets after the array do not matter.
+ * A cut-off array is repaired by keeping its complete objects.
+ */
+internal fun extractArray(text: String): JSONArray? {
+    val start = Regex("\\[\\s*\\{").find(text)?.range?.first ?: return null
+    var depth = 0
+    var inString = false
+    var escaped = false
+    var lastObjectEnd = -1
+    for (i in start until text.length) {
+        val ch = text[i]
+        if (inString) {
+            when {
+                escaped -> escaped = false
+                ch == '\\' -> escaped = true
+                ch == '"' -> inString = false
+            }
+            continue
+        }
+        when (ch) {
+            '"' -> inString = true
+            '[', '{' -> depth++
+            ']', '}' -> {
+                depth--
+                if (depth == 1 && ch == '}') lastObjectEnd = i
+                if (depth == 0) return runCatching { JSONArray(text.substring(start, i + 1)) }.getOrNull()
+            }
+        }
+    }
+    // Truncated: keep everything up to the last complete object.
+    if (lastObjectEnd < 0) return null
+    return runCatching { JSONArray(text.substring(start, lastObjectEnd + 1) + "]") }.getOrNull()
 }
 
 object Prompts {

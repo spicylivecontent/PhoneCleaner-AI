@@ -12,6 +12,7 @@ import android.provider.Telephony
 import android.telecom.TelecomManager
 import android.view.inputmethod.InputMethodManager
 import com.phonecleaner.ai.BuildConfig
+import com.phonecleaner.ai.shizuku.Shell
 import com.phonecleaner.ai.shizuku.ShizukuManager
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -20,7 +21,7 @@ import kotlinx.coroutines.withContext
  * Step 1: collects information about the phone. Everything here is read-only:
  * only "list", "get", "query" and "dumpsys" commands are used.
  */
-class Scanner(private val context: Context) {
+class Scanner(private val context: Context, private val shell: Shell = ShizukuManager) {
 
     private val knownStores = setOf(
         "com.android.vending", "com.xiaomi.mipicks", "com.xiaomi.market", "com.xiaomi.discover",
@@ -36,7 +37,7 @@ class Scanner(private val context: Context) {
 
     private suspend fun sh(cmd: String, warnings: MutableList<String>): String {
         val r = try {
-            ShizukuManager.exec(cmd)
+            shell.exec(cmd)
         } catch (t: Throwable) {
             warnings += "$cmd: ${t.message}"
             return ""
@@ -45,9 +46,43 @@ class Scanner(private val context: Context) {
         return if (r.ok) r.output else ""
     }
 
+    /**
+     * Packages that must not be removed right now: home screens, keyboards and the
+     * apps holding important default roles. Cheap, so it is re-checked before every removal.
+     */
+    suspend fun protectedNow(warnings: MutableList<String> = mutableListOf()): Map<String, LockReason> {
+        val pm = context.packageManager
+        val out = LinkedHashMap<String, LockReason>()
+        for (role in listOf("DIALER", "SMS", "BROWSER", "ASSISTANT")) {
+            Parsers.plainPackages(sh("cmd role get-role-holders --user 0 android.app.role.$role", warnings).replace(';', '\n'))
+                .forEach { out[it] = LockReason.DEFAULT_APP }
+        }
+        runCatching { context.getSystemService(TelecomManager::class.java)?.defaultDialerPackage?.let { out[it] = LockReason.DEFAULT_APP } }
+        runCatching { Telephony.Sms.getDefaultSmsPackage(context)?.let { out[it] = LockReason.DEFAULT_APP } }
+        sh("settings get global webview_provider", warnings).trim().takeIf { Parsers.isValidPackage(it) }
+            ?.let { out[it] = LockReason.CORE }
+
+        runCatching {
+            context.getSystemService(InputMethodManager::class.java)?.inputMethodList?.forEach { out[it.packageName] = LockReason.KEYBOARD }
+        }.onFailure { warnings += "keyboard list unavailable" }
+        (Parsers.componentPackages(sh("settings get secure enabled_input_methods", warnings)) +
+            Parsers.componentPackages(sh("settings get secure default_input_method", warnings)))
+            .forEach { out[it] = LockReason.KEYBOARD }
+
+        runCatching {
+            pm.queryIntentActivities(Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_HOME), 0)
+                .forEach { out[it.activityInfo.packageName] = LockReason.LAUNCHER }
+        }.onFailure { warnings += "launcher list unavailable" }
+        Parsers.plainPackages(sh("cmd role get-role-holders --user 0 android.app.role.HOME", warnings).replace(';', '\n'))
+            .forEach { out[it] = LockReason.LAUNCHER }
+        return out
+    }
+
     suspend fun scan(progress: (Int) -> Unit): ScanResult = withContext(Dispatchers.Default) {
         val warnings = mutableListOf<String>()
         val pm = context.packageManager
+        // All commands target user 0. In Second Space or a work profile the two views would not match.
+        if (android.os.Process.myUid() / 100000 != 0) throw IllegalStateException("not running as the main user (user 0)")
 
         progress(0)
         val listed = Parsers.pmList(sh("pm list packages -f -i -u --user 0", warnings))
@@ -58,9 +93,11 @@ class Scanner(private val context: Context) {
 
         progress(1)
         @Suppress("DEPRECATION")
-        val infos: Map<String, PackageInfo> = runCatching {
+        val infos: Map<String, PackageInfo> =
             pm.getInstalledPackages(PackageManager.GET_PERMISSIONS or PackageManager.MATCH_UNINSTALLED_PACKAGES)
-        }.getOrDefault(emptyList()).associateBy { it.packageName }
+                .associateBy { it.packageName }
+        // Without package details the "always running" and "no code" locks cannot be computed: stop here.
+        if (infos.isEmpty()) throw IllegalStateException("the package manager returned no package details")
         val launcherPkgs = pm.queryIntentActivities(
             Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_LAUNCHER), 0
         ).map { it.activityInfo.packageName }.toSet()
@@ -100,18 +137,7 @@ class Scanner(private val context: Context) {
         }
         val model = listOf(Build.MANUFACTURER, market.ifEmpty { Build.MODEL }, "(${Build.MODEL})").joinToString(" ")
 
-        // Dynamic "never touch" packages: current launchers, keyboards and default apps.
-        val launchers = pm.queryIntentActivities(Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_HOME), 0)
-            .map { it.activityInfo.packageName }.toSet()
-        val keyboards = HashSet<String>()
-        runCatching {
-            context.getSystemService(InputMethodManager::class.java)?.inputMethodList?.forEach { keyboards += it.packageName }
-        }
-        keyboards += Parsers.componentPackages(sh("settings get secure enabled_input_methods", warnings))
-        keyboards += Parsers.componentPackages(sh("settings get secure default_input_method", warnings))
-        val defaults = HashSet<String>()
-        runCatching { context.getSystemService(TelecomManager::class.java)?.defaultDialerPackage?.let { defaults += it } }
-        runCatching { Telephony.Sms.getDefaultSmsPackage(context)?.let { defaults += it } }
+        val dynamicLocks = protectedNow(warnings)
 
         val permDangerous = HashMap<String, Boolean>()
         fun isDangerous(name: String) = permDangerous.getOrPut(name) {
@@ -142,9 +168,9 @@ class Scanner(private val context: Context) {
             val lock = when {
                 e.pkg == BuildConfig.APPLICATION_ID -> LockReason.SELF
                 Critical.isCore(e.pkg) -> LockReason.CORE
-                e.pkg in launchers -> LockReason.LAUNCHER
-                e.pkg in keyboards -> LockReason.KEYBOARD
-                e.pkg in defaults -> LockReason.DEFAULT_APP
+                e.pkg in dynamicLocks -> dynamicLocks.getValue(e.pkg)
+                // No details from the package manager: we cannot tell what it is, so it stays locked.
+                ai == null && installed -> LockReason.UNKNOWN
                 ai != null && isSystem && ai.flags and ApplicationInfo.FLAG_PERSISTENT != 0 -> LockReason.PERSISTENT
                 ai != null && isSystem && ai.flags and ApplicationInfo.FLAG_HAS_CODE == 0 -> LockReason.RESOURCE_OVERLAY
                 else -> null

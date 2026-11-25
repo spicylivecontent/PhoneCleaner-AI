@@ -66,6 +66,10 @@ interface AppDao {
     @Query("SELECT * FROM change WHERE reverted = 0 ORDER BY id DESC") suspend fun activeChanges(): List<ChangeEntity>
     @Insert suspend fun insertChange(c: ChangeEntity): Long
     @Query("UPDATE change SET reverted = 1 WHERE id = :id") suspend fun markReverted(id: Long)
+    @Query("DELETE FROM change WHERE id = :id") suspend fun deleteChange(id: Long)
+    @Query("UPDATE change SET newValue = :value WHERE id = :id") suspend fun updateNewValue(id: Long, value: String)
+    @Query("SELECT * FROM change WHERE reverted = 0 AND kind = :kind AND target = :target AND detail = :detail LIMIT 1")
+    suspend fun activeChangeFor(kind: String, target: String, detail: String): ChangeEntity?
 
     @Query("SELECT * FROM log ORDER BY id DESC LIMIT 1000") fun logs(): Flow<List<LogEntity>>
     @Insert suspend fun insertLog(l: LogEntity)
@@ -77,6 +81,12 @@ abstract class AppDb : RoomDatabase() {
 
     companion object {
         @Volatile private var instance: AppDb? = null
+
+        @androidx.annotation.VisibleForTesting
+        fun closeForTest() {
+            instance?.close()
+            instance = null
+        }
         fun get(context: Context): AppDb = instance ?: synchronized(this) {
             instance ?: Room.databaseBuilder(context.applicationContext, AppDb::class.java, "phonecleaner.db")
                 .build().also { instance = it }

@@ -100,9 +100,10 @@ fun ResearchScreen(vm: MainViewModel) {
                     )
                 )
                 if (state.running) BodyText(stringResource(R.string.research_keep_open))
+                if (state.batchesFailed > 0) BodyText(stringResource(R.string.research_failed_fmt, state.batchesFailed))
                 if (state.finished) BodyText(stringResource(R.string.research_done))
                 state.error?.let {
-                    val msg = when (state.errorKind) {
+                    val msg = if (it == MainViewModel.KEY_UNREADABLE) stringResource(R.string.key_unreadable) else when (state.errorKind) {
                         ClaudeException.Kind.BAD_KEY -> stringResource(R.string.research_err_key, it)
                         ClaudeException.Kind.NETWORK -> stringResource(R.string.research_err_network, it)
                         else -> stringResource(R.string.error_fmt, it)

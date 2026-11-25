@@ -3,7 +3,7 @@ package com.phonecleaner.ai.scan
 import org.json.JSONArray
 import org.json.JSONObject
 
-enum class LockReason { CORE, LAUNCHER, KEYBOARD, DEFAULT_APP, PERSISTENT, RESOURCE_OVERLAY, SELF }
+enum class LockReason { CORE, LAUNCHER, KEYBOARD, DEFAULT_APP, PERSISTENT, RESOURCE_OVERLAY, SELF, UNKNOWN }
 
 data class AppInfo(
     val pkg: String,
@@ -60,7 +60,8 @@ data class AppInfo(
             dataBytes = if (o.isNull("dataBytes")) null else o.getLong("dataBytes"),
             storageBytes = if (o.isNull("storageBytes")) null else o.getLong("storageBytes"),
             lastUsed = o.strOrNull("lastUsed"),
-            lockReason = o.strOrNull("lockReason")?.let { runCatching { LockReason.valueOf(it) }.getOrNull() },
+            // An unrecognised reason still means locked: never fail open.
+            lockReason = o.strOrNull("lockReason")?.let { runCatching { LockReason.valueOf(it) }.getOrDefault(LockReason.UNKNOWN) },
             suspicious = o.getBoolean("suspicious"),
         )
     }

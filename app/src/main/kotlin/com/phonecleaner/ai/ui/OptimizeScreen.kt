@@ -107,7 +107,7 @@ fun OptimizeScreen(vm: MainViewModel) {
             active.take(30).forEach { BodyText("• " + changeTitle(it)) }
             if (active.isNotEmpty()) {
                 Row(Modifier.padding(top = 8.dp)) {
-                    OutlinedButton(onClick = { vm.revert(active) }) { Text(stringResource(R.string.optimize_undo_all)) }
+                    OutlinedButton(onClick = { vm.planRevert(active) }) { Text(stringResource(R.string.optimize_undo_all)) }
                 }
                 OutlinedButton(onClick = { vm.go(Screen.RESTORE) }, modifier = Modifier.padding(top = 4.dp)) {
                     Text(stringResource(R.string.step_restore))

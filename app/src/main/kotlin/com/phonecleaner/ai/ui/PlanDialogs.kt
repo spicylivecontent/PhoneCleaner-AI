@@ -60,14 +60,36 @@ fun PlanDialogs(vm: MainViewModel) {
         )
     }
 
+    val revert by vm.pendingRevert.collectAsStateWithLifecycle()
+    revert?.let { list ->
+        AlertDialog(
+            onDismissRequest = { vm.cancelRevert() },
+            title = { Text(stringResource(R.string.restore_all_title)) },
+            text = {
+                Column(Modifier.heightIn(max = 420.dp).verticalScroll(rememberScrollState())) {
+                    Text(stringResource(R.string.restore_all_text, list.size))
+                    Text(stringResource(R.string.confirm_commands), Modifier.padding(top = 12.dp), fontWeight = FontWeight.SemiBold)
+                    list.forEach {
+                        Text(changeTitle(it), Modifier.padding(top = 8.dp), style = MaterialTheme.typography.bodyMedium)
+                        Text(Ops.revertCommand(it), fontFamily = FontFamily.Monospace, style = MaterialTheme.typography.bodySmall)
+                    }
+                }
+            },
+            confirmButton = { Button(onClick = { vm.confirmRevert() }) { Text(stringResource(R.string.confirm_yes)) } },
+            dismissButton = { TextButton(onClick = { vm.cancelRevert() }) { Text(stringResource(R.string.cancel)) } },
+        )
+    }
+
     if (work.visible) {
         AlertDialog(
             onDismissRequest = { vm.dismissWork() },
             title = { Text(stringResource(if (work.restoring) R.string.work_restoring else R.string.work_title)) },
             text = {
                 Column(Modifier.heightIn(max = 420.dp).verticalScroll(rememberScrollState())) {
-                    if (work.error == "Shizuku") {
+                    if (work.error == MainViewModel.ERR_SHIZUKU) {
                         Text(stringResource(R.string.need_shizuku), color = MaterialTheme.colorScheme.error)
+                    } else if (work.error == MainViewModel.ERR_ROOT) {
+                        Text(stringResource(R.string.err_root), color = MaterialTheme.colorScheme.error)
                     } else {
                         if (work.total > 0) LinearProgressIndicator(
                             progress = { work.done / work.total.toFloat() },

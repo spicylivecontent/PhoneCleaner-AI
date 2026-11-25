@@ -26,8 +26,9 @@ class ShellService() : IShellService.Stub() {
         val pipe = ParcelFileDescriptor.createPipe()
         thread(name = "pca-shell") {
             ParcelFileDescriptor.AutoCloseOutputStream(pipe[1]).use { out ->
+                var process: Process? = null
                 try {
-                    val process = ProcessBuilder("sh", "-c", command)
+                    process = ProcessBuilder("/system/bin/sh", "-c", command)
                         .redirectErrorStream(true)
                         .start()
                     process.outputStream.close()
@@ -36,6 +37,9 @@ class ShellService() : IShellService.Stub() {
                     out.write("\n$EXIT_MARKER$code\n".toByteArray())
                 } catch (t: Throwable) {
                     runCatching { out.write("\n${t.message}\n${EXIT_MARKER}-1\n".toByteArray()) }
+                } finally {
+                    // If the reader went away, do not leave the command running.
+                    process?.destroy()
                 }
             }
         }
