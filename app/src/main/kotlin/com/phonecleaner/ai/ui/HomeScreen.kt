@@ -8,6 +8,7 @@ import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
@@ -51,6 +52,26 @@ fun HomeScreen(vm: MainViewModel) {
 
 @Composable
 fun HomeSteps(vm: MainViewModel) {
+    val scan by vm.scan.collectAsStateWithLifecycle()
+    StepButton(
+        stringResource(R.string.step_scan),
+        scan?.let { stringResource(R.string.scan_done_fmt, it.apps.size, formatTime(it.time)) }
+            ?: stringResource(R.string.scan_none),
+    ) { vm.go(com.phonecleaner.ai.Screen.SCAN) }
+}
+
+@Composable
+fun StepButton(title: String, subtitle: String, enabled: Boolean = true, onClick: () -> Unit) {
+    androidx.compose.material3.OutlinedCard(
+        onClick = onClick,
+        enabled = enabled,
+        modifier = Modifier.padding(vertical = 4.dp).fillMaxWidth(),
+    ) {
+        Column(Modifier.padding(16.dp)) {
+            Text(title, style = MaterialTheme.typography.titleMedium)
+            Text(subtitle, style = MaterialTheme.typography.bodySmall)
+        }
+    }
 }
 
 @OptIn(ExperimentalLayoutApi::class)

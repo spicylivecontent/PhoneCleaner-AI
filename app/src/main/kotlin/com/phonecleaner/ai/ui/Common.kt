@@ -36,3 +36,12 @@ fun SectionCard(
 fun BodyText(text: String, modifier: Modifier = Modifier) {
     Text(text, modifier = modifier.padding(top = 6.dp), style = MaterialTheme.typography.bodyMedium)
 }
+
+fun formatTime(millis: Long): String =
+    java.text.SimpleDateFormat("yyyy-MM-dd HH:mm", java.util.Locale.getDefault()).format(java.util.Date(millis))
+
+fun formatBytes(bytes: Long): String = when {
+    bytes >= 1L shl 30 -> String.format(java.util.Locale.US, "%.1f GB", bytes / 1073741824.0)
+    bytes >= 1L shl 20 -> String.format(java.util.Locale.US, "%.0f MB", bytes / 1048576.0)
+    else -> String.format(java.util.Locale.US, "%.0f kB", bytes / 1024.0)
+}

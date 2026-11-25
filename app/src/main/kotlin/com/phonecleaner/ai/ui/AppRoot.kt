@@ -49,6 +49,7 @@ fun AppRoot(vm: MainViewModel = viewModel()) {
         Box(Modifier.fillMaxSize().padding(pad)) {
             when (screen) {
                 Screen.HOME -> HomeScreen(vm)
+                Screen.SCAN -> ScanScreen(vm)
                 else -> HomeScreen(vm)
             }
         }

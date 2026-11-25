@@ -28,4 +28,36 @@
     <string name="open_dev_options">Developer options</string>
     <string name="shizuku_grant">Allow access</string>
     <string name="shizuku_test">Test connection</string>
+    <string name="scan_none">Not scanned yet</string>
+    <string name="scan_done_fmt">%1$d packages found · %2$s</string>
+    <string name="scan_intro">The scan only reads information. Nothing on the phone is changed.</string>
+    <string name="need_shizuku">Shizuku must be connected first (see the start page).</string>
+    <string name="scan_start">Start scan</string>
+    <string name="scan_again">Scan again</string>
+    <string name="error_fmt">Error: %1$s</string>
+    <string name="scan_device">Phone</string>
+    <string name="scan_summary">Summary</string>
+    <string name="scan_summary_fmt">%1$d installed packages\n%2$d system apps, %3$d installed by you\n%4$d locked (critical, never touched)\n%5$d already removed for your user</string>
+    <string name="scan_suspicious">Possible adware or malware (%1$d)</string>
+    <string name="scan_suspicious_none">Nothing matched the pattern: sideloaded + hidden icon + overlay, device admin or accessibility.</string>
+    <string name="scan_suspicious_why">Sideloaded apps that hide their icon and hold strong powers. The AI research will look closer.</string>
+    <string name="scan_admins">Device administrators (%1$d)</string>
+    <string name="scan_accessibility">Active accessibility services (%1$d)</string>
+    <string name="scan_overlay">Can draw over other apps (%1$d)</string>
+    <string name="scan_sideloaded">Sideloaded, not from a store (%1$d)</string>
+    <string name="scan_no_icon">Your apps without an icon in the launcher (%1$d)</string>
+    <string name="scan_many_perms">Most dangerous permissions granted</string>
+    <string name="scan_top_storage">Most storage</string>
+    <string name="scan_top_battery">Most battery since last full charge</string>
+    <string name="scan_top_data">Most data traffic</string>
+    <string name="scan_settings">Settings</string>
+    <string name="scan_warnings">Could not be read on this phone</string>
+    <string-array name="scan_steps">
+        <item>Listing packages…</item>
+        <item>Reading permissions and icons…</item>
+        <item>Checking overlay, device admins and accessibility…</item>
+        <item>Reading battery, data and storage…</item>
+        <item>Reading settings…</item>
+        <item>Done</item>
+    </string-array>
 </resources>

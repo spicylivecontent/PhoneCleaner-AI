@@ -28,4 +28,36 @@
     <string name="open_dev_options">Utvecklaralternativ</string>
     <string name="shizuku_grant">Ge behörighet</string>
     <string name="shizuku_test">Testa anslutningen</string>
+    <string name="scan_none">Inte skannad än</string>
+    <string name="scan_done_fmt">%1$d paket hittade · %2$s</string>
+    <string name="scan_intro">Skanningen läser bara information. Ingenting på telefonen ändras.</string>
+    <string name="need_shizuku">Shizuku måste vara anslutet först (se startsidan).</string>
+    <string name="scan_start">Starta skanning</string>
+    <string name="scan_again">Skanna igen</string>
+    <string name="error_fmt">Fel: %1$s</string>
+    <string name="scan_device">Telefon</string>
+    <string name="scan_summary">Sammanfattning</string>
+    <string name="scan_summary_fmt">%1$d installerade paket\n%2$d systemappar, %3$d installerade av dig\n%4$d låsta (kritiska, rörs aldrig)\n%5$d redan borttagna för din användare</string>
+    <string name="scan_suspicious">Möjlig adware eller skadlig kod (%1$d)</string>
+    <string name="scan_suspicious_none">Inget matchade mönstret: sidladdad + dold ikon + overlay, enhetsadmin eller tillgänglighet.</string>
+    <string name="scan_suspicious_why">Sidladdade appar som döljer sin ikon och har starka befogenheter. AI-researchen tittar närmare.</string>
+    <string name="scan_admins">Enhetsadministratörer (%1$d)</string>
+    <string name="scan_accessibility">Aktiva tillgänglighetstjänster (%1$d)</string>
+    <string name="scan_overlay">Får visas över andra appar (%1$d)</string>
+    <string name="scan_sideloaded">Sidladdade, inte från en butik (%1$d)</string>
+    <string name="scan_no_icon">Dina appar utan ikon i startmenyn (%1$d)</string>
+    <string name="scan_many_perms">Flest farliga behörigheter beviljade</string>
+    <string name="scan_top_storage">Mest lagring</string>
+    <string name="scan_top_battery">Mest batteri sedan senaste fulladdning</string>
+    <string name="scan_top_data">Mest datatrafik</string>
+    <string name="scan_settings">Inställningar</string>
+    <string name="scan_warnings">Kunde inte läsas på den här telefonen</string>
+    <string-array name="scan_steps">
+        <item>Listar paket…</item>
+        <item>Läser behörigheter och ikoner…</item>
+        <item>Kontrollerar overlay, enhetsadmin och tillgänglighet…</item>
+        <item>Läser batteri, data och lagring…</item>
+        <item>Läser inställningar…</item>
+        <item>Klart</item>
+    </string-array>
 </resources>
