@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">PhoneCleaner AI</string>
+    <string name="home_intro">Skannar den här telefonen, frågar Claude vad som är säkert att ta bort och rensar bara det du godkänner.</string>
+    <string name="version_fmt">Version %1$s</string>
+</resources>
