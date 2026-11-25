@@ -11,6 +11,10 @@ import com.phonecleaner.ai.ai.Usage
 import com.phonecleaner.ai.data.AnalysisEntity
 import com.phonecleaner.ai.data.AppDb
 import com.phonecleaner.ai.data.Prefs
+import com.phonecleaner.ai.data.ChangeEntity
+import com.phonecleaner.ai.ops.Ops
+import com.phonecleaner.ai.ops.Planned
+import com.phonecleaner.ai.shizuku.ShizukuState
 import com.phonecleaner.ai.scan.AppInfo
 import com.phonecleaner.ai.scan.ScanResult
 import kotlinx.coroutines.CancellationException
@@ -236,6 +240,154 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
 
     fun resetSelection() {
         overrides.value = emptyMap()
+    }
+
+    // ---- Step 4: cleaning, optimisation and undo ----
+    private val ops = Ops(app, dao)
+    val changes = dao.changes().stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())
+    val logs = dao.logs().stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())
+
+    /** A plan waiting for the user's confirmation. Nothing runs until confirmPlan(). */
+    val pendingPlan = MutableStateFlow<List<Planned>?>(null)
+
+    data class WorkState(
+        val visible: Boolean = false,
+        val running: Boolean = false,
+        val restoring: Boolean = false,
+        val total: Int = 0,
+        val done: Int = 0,
+        val succeeded: Int = 0,
+        val disabledInstead: List<String> = emptyList(),
+        val failed: List<String> = emptyList(),
+        val backupPath: String? = null,
+        val error: String? = null,
+    )
+
+    val work = MutableStateFlow(WorkState())
+
+    fun planClean() {
+        val sel = selected.value
+        val plan = rows.value.filter { it.selectable && it.app.pkg in sel }
+            .map { Planned(Ops.UNINSTALL, it.app.pkg, it.app.label, detail = if (it.app.isSystem) "" else "user") }
+        if (plan.isNotEmpty()) pendingPlan.value = plan
+    }
+
+    /** Apps the scan or Claude flagged as ad/tracker/malware and that are still installed. */
+    fun flaggedApps(): List<AppInfo> = rows.value.filter {
+        it.selectable && (it.app.suspicious || it.analysis?.isAdOrTracker == true || it.analysis?.suspectedMalware == true)
+    }.map { it.app }
+
+    fun planOptimize(animations: Boolean, dns: Boolean, overlay: Boolean, background: Boolean) {
+        val plan = ArrayList<Planned>()
+        if (animations) for (key in listOf("window_animation_scale", "transition_animation_scale", "animator_duration_scale")) {
+            plan += Planned(Ops.SETTING, "global $key", key, newValue = "0.5")
+        }
+        if (dns) {
+            plan += Planned(Ops.SETTING, "global private_dns_specifier", "private_dns_specifier", newValue = dnsHost.value)
+            plan += Planned(Ops.SETTING, "global private_dns_mode", "private_dns_mode", newValue = "hostname")
+        }
+        for (app in flaggedApps()) {
+            if (overlay && app.overlay) plan += Planned(Ops.APPOP, app.pkg, app.label, "SYSTEM_ALERT_WINDOW", "deny")
+            if (background) plan += Planned(Ops.APPOP, app.pkg, app.label, "RUN_ANY_IN_BACKGROUND", "ignore")
+        }
+        if (plan.isNotEmpty()) pendingPlan.value = plan
+    }
+
+    fun cancelPlan() {
+        pendingPlan.value = null
+    }
+
+    private fun updateScan(transform: (ScanResult) -> ScanResult) {
+        val s = scan.value ?: return
+        val next = transform(s)
+        scan.value = next
+        viewModelScope.launch(Dispatchers.IO) { runCatching { scanFile.writeText(next.toJson().toString()) } }
+    }
+
+    private fun setInstalled(pkg: String, installed: Boolean) = updateScan { s ->
+        s.copy(apps = s.apps.map { if (it.pkg == pkg) it.copy(installed = installed) else it })
+    }
+
+    /** Runs the confirmed plan: backup file first, then each change, all logged. */
+    fun confirmPlan() {
+        val plan = pendingPlan.value ?: return
+        pendingPlan.value = null
+        if (work.value.running) return
+        if (shizukuState.value != ShizukuState.READY) {
+            work.value = WorkState(visible = true, error = "Shizuku")
+            return
+        }
+        work.value = WorkState(visible = true, running = true, total = plan.size)
+        viewModelScope.launch {
+            try {
+                val backup = ops.writeBackup(plan)
+                work.value = work.value.copy(backupPath = backup.absolutePath)
+                val apps = scan.value?.apps.orEmpty().associateBy { it.pkg }
+                for (p in plan) {
+                    var disabled = false
+                    val ok = if (p.kind == Ops.UNINSTALL) {
+                        val app = apps[p.target]
+                        val kind = if (app == null) null else ops.removePackage(app)
+                        if (kind != null) setInstalled(p.target, false)
+                        disabled = kind == Ops.DISABLE
+                        kind != null
+                    } else {
+                        val applied = ops.apply(p)
+                        if (applied && p.kind == Ops.SETTING) updateScan { it.copy(settings = it.settings + (p.target to p.newValue)) }
+                        applied
+                    }
+                    val name = if (p.kind == Ops.APPOP) "${p.label} (${p.detail})" else p.label
+                    work.value = work.value.let {
+                        it.copy(
+                            done = it.done + 1,
+                            succeeded = it.succeeded + if (ok) 1 else 0,
+                            disabledInstead = if (disabled) it.disabledInstead + name else it.disabledInstead,
+                            failed = if (ok) it.failed else it.failed + name,
+                        )
+                    }
+                }
+            } catch (t: Throwable) {
+                work.value = work.value.copy(error = t.message ?: t.javaClass.simpleName)
+            } finally {
+                work.value = work.value.copy(running = false)
+            }
+        }
+    }
+
+    fun dismissWork() {
+        if (!work.value.running) work.value = WorkState()
+    }
+
+    /** Undoes the given recorded changes (newest first). */
+    fun revert(list: List<ChangeEntity>) {
+        if (work.value.running || list.isEmpty()) return
+        if (shizukuState.value != ShizukuState.READY) {
+            work.value = WorkState(visible = true, restoring = true, error = "Shizuku")
+            return
+        }
+        work.value = WorkState(visible = true, running = true, restoring = true, total = list.size)
+        viewModelScope.launch {
+            try {
+                for (c in list) {
+                    val ok = ops.revert(c)
+                    if (ok) when (c.kind) {
+                        Ops.UNINSTALL, Ops.DISABLE -> setInstalled(c.target, true)
+                        Ops.SETTING -> updateScan { it.copy(settings = it.settings + (c.target to c.originalValue)) }
+                    }
+                    work.value = work.value.let {
+                        it.copy(
+                            done = it.done + 1,
+                            succeeded = it.succeeded + if (ok) 1 else 0,
+                            failed = if (ok) it.failed else it.failed + c.label,
+                        )
+                    }
+                }
+            } catch (t: Throwable) {
+                work.value = work.value.copy(error = t.message ?: t.javaClass.simpleName)
+            } finally {
+                work.value = work.value.copy(running = false)
+            }
+        }
     }
 
     companion object {

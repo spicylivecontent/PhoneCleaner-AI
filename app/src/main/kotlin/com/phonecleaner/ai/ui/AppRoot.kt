@@ -47,11 +47,14 @@ fun AppRoot(vm: MainViewModel = viewModel()) {
         },
     ) { pad ->
         Box(Modifier.fillMaxSize().padding(pad)) {
+            PlanDialogs(vm)
             when (screen) {
                 Screen.HOME -> HomeScreen(vm)
                 Screen.SCAN -> ScanScreen(vm)
                 Screen.RESEARCH -> ResearchScreen(vm)
                 Screen.LIST -> ListScreen(vm)
+                Screen.RESTORE -> RestoreScreen(vm)
+                Screen.LOG -> LogScreen(vm)
                 Screen.SETTINGS -> SettingsScreen(vm)
                 else -> HomeScreen(vm)
             }

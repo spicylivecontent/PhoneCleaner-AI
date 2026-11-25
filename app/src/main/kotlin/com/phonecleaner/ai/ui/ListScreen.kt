@@ -117,6 +117,14 @@ fun ListScreen(vm: MainViewModel) {
 
 @Composable
 fun ListBottomBar(vm: MainViewModel, count: Int) {
+    Surface(tonalElevation = 3.dp) {
+        Column(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp)) {
+            Button(onClick = { vm.planClean() }, enabled = count > 0, modifier = Modifier.fillMaxWidth()) {
+                Text(stringResource(R.string.clean_button_fmt, count))
+            }
+            Text(stringResource(R.string.clean_button_hint), style = MaterialTheme.typography.bodySmall)
+        }
+    }
 }
 
 @Composable

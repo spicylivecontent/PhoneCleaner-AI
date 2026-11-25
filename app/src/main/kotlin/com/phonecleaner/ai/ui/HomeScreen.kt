@@ -92,6 +92,19 @@ fun HomeStepsMore(vm: MainViewModel) {
 
 @Composable
 fun HomeStepsTail(vm: MainViewModel) {
+    val changes by vm.changes.collectAsStateWithLifecycle()
+    HomeStepsOptimize(vm)
+    StepButton(
+        stringResource(R.string.step_restore),
+        stringResource(R.string.restore_status_fmt, changes.count { !it.reverted }),
+    ) { vm.go(com.phonecleaner.ai.Screen.RESTORE) }
+    StepButton(stringResource(R.string.step_log), stringResource(R.string.log_subtitle)) {
+        vm.go(com.phonecleaner.ai.Screen.LOG)
+    }
+}
+
+@Composable
+fun HomeStepsOptimize(vm: MainViewModel) {
 }
 
 @Composable
