@@ -154,8 +154,8 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
     val research = MutableStateFlow(ResearchState())
     private var researchJob: Job? = null
 
-    /** Packages that may be sent to Claude: installed and not locked. */
-    fun researchCandidates(s: ScanResult): List<AppInfo> = s.apps.filter { it.installed && !it.locked }
+    /** Packages that may be sent to Claude: installed, enabled and not locked. */
+    fun researchCandidates(s: ScanResult): List<AppInfo> = s.apps.filter { it.installed && it.enabled && !it.locked }
 
     fun startResearch() {
         val s = scan.value ?: return
@@ -221,7 +221,7 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
     private val overrides = MutableStateFlow<Map<String, Boolean>>(emptyMap())
 
     val rows = combine(scan, analyses) { s, a ->
-        s?.apps.orEmpty().filter { it.installed }.map { Row(it, a[it.pkg]) }
+        s?.apps.orEmpty().filter { it.installed && (it.enabled || it.locked) }.map { Row(it, a[it.pkg]) }
     }.stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())
 
     val selected = combine(rows, overrides) { r, o ->

@@ -38,6 +38,9 @@ jobs:
         with:
           cache-disabled: true
 
+      - name: Install Android platform
+        run: yes | "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" "platforms;android-37.2" > /dev/null || true
+
       - name: Decode keystore
         env:
           KEYSTORE_BASE64: ${{ secrets.KEYSTORE_BASE64 }}
